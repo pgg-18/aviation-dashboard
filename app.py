@@ -154,19 +154,19 @@ MONTHS = ["January", "February", "March", "April", "May"]
 YTD_CHARTS = [
     {
         "title": "Aircraft Movement - YTD 2026", "subtitle": "",
-        "bar_legend": "Total aircraft", "line_legend": "YTD aircraft",
+        "bar_legend": "Total aircraft movement", "line_legend": "Ytd aircraft movement",
         "bars": [253.0, 231.6, 242.9, 241.1, 254.2],
-        "ytd":  [253.0, 484.6, 727.5, 968.6, 1222.8], # Fixed Feb YTD to 484.6
+        "ytd":  [253.0, 484.6, 727.5, 968.6, 1222.8], 
     },
     {
         "title": "Passenger Traffic - YTD 2026", "subtitle": "(in Thousands)",
-        "bar_legend": "Total Pax", "line_legend": "YTD Pax",
+        "bar_legend": "Total passenger traffic", "line_legend": "Ytd passenger traffic",
         "bars": [38.6, 35.1, 34.5, 33.8, 37.0],
-        "ytd":  [38.6, 73.7, 108.2, 142.0, 179.0],
+        "ytd":  [38.6, 73.7, 108.2, 142.1, 179.0],
     },
     {
         "title": "Air Cargo Movement - YTD 2026", "subtitle": "(in Thousand MT)",
-        "bar_legend": "Total Cargo", "line_legend": "YTD Cargo",
+        "bar_legend": "Total cargo movement", "line_legend": "Ytd cargo movement",
         "bars": [324.7, 328.5, 343.2, 347.5, 364.4],
         "ytd":  [324.7, 653.2, 996.4, 1343.9, 1708.3],
     },
@@ -199,7 +199,7 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
         cx = left + slot * i + slot / 2
         bw = slot * 0.40
         by = y_of(bars[i])
-        # Changed bar fill from BAR_BLUE to BURGUNDY
+        # Changed bar fill to BURGUNDY
         P.append(f'<rect x="{cx-bw/2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{base_y-by:.1f}" fill="{BURGUNDY}"/>')
         P.append(f'<text x="{cx:.1f}" y="{by-3:.1f}" text-anchor="middle" font-size="8.5" fill="#333">{bars[i]:.1f}</text>')
         P.append(f'<text x="{cx:.1f}" y="{base_y+13:.1f}" text-anchor="middle" font-size="8" fill="#555">{months[i]}</text>')
@@ -216,7 +216,7 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
 
     # legend
     ly = H - 10
-    # Changed legend box fill from BAR_BLUE to BURGUNDY
+    # Changed legend box fill to BURGUNDY
     P.append(f'<rect x="{left+4}" y="{ly-8}" width="11" height="9" fill="{BURGUNDY}"/>')
     P.append(f'<text x="{left+19}" y="{ly}" font-size="9" fill="#444">{bar_legend}</text>')
     lx2 = W * 0.55
@@ -277,9 +277,12 @@ def manual_dialog(store):
             cur_metrics = current.get(skey, {}).get("metrics", {})
             for label in cfg["metrics"]:
                 cur = cur_metrics.get(label)
+                # Safely change display string without breaking backend dict mapping
+                display_label = label.replace("Pax", "Passengers") 
+                
                 placeholder = f"current: {cur}" if cur not in (None, "") else "blank"
                 entered[skey][label] = st.text_input(
-                    label,
+                    display_label,
                     value="",
                     placeholder=placeholder,
                     key=f"manual__{nonce}__{skey}__{label}",
@@ -355,9 +358,11 @@ else:
         for label in cfg["metrics"]:
             val = metrics.get(label)
             val_txt = html.escape(str(val)) if val not in (None, "") else "\u2014"
+            # Replace Pax for display here as well
+            display_label = label.replace("Pax", "Passengers")
             rows_html += (
                 f'<div class="metric-row">'
-                f'<span class="metric-label">{label}</span>'
+                f'<span class="metric-label">{display_label}</span>'
                 f'<span class="metric-value">{val_txt}</span>'
                 f'</div>'
             )
