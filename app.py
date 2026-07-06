@@ -162,7 +162,7 @@ YTD_CHARTS = [
         "title": "Passenger Traffic - YTD 2026", "subtitle": "(in Thousands)",
         "bar_legend": "Total Pax", "line_legend": "YTD Pax",
         "bars": [38.6, 35.1, 34.5, 33.8, 37.0],
-        "ytd":  [38.6, 73.7, 108.2, 142.1, 179.0],
+        "ytd":  [38.6, 73.7, 108.2, 142.0, 179.0],
     },
     {
         "title": "Air Cargo Movement - YTD 2026", "subtitle": "(in Thousand MT)",
