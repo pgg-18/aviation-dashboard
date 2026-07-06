@@ -1,0 +1,68 @@
+{
+  "data": {
+    "domestic_traffic": {
+      "title": "Domestic Traffic",
+      "date": "On 05 July 2026",
+      "metrics": {
+        "Departing flights": "2,678",
+        "Departing Pax": "4,16,305",
+        "Arriving flights": "2,661",
+        "Arriving Pax": "4,11,091",
+        "Aircraft movements": "5,339",
+        "Airport footfalls": "8,27,396"
+      }
+    },
+    "international_traffic": {
+      "title": "International Traffic",
+      "date": "On 05 July 2026",
+      "metrics": {
+        "Departing flights": "591",
+        "Departing Pax": "1,02,493",
+        "Arriving flights": "586",
+        "Arriving Pax": "1,15,573",
+        "Aircraft movements": "1,177",
+        "Airport footfalls": "2,18,066"
+      }
+    },
+    "udan": {
+      "title": "UDAN (RCS)",
+      "date": "Till 02 Jan 2026",
+      "metrics": {
+        "Airports*": "93",
+        "Routes": "657",
+        "Operators": "10",
+        "Flights": "3.34 Lakhs",
+        "Passengers": "159 Lakhs",
+        "Viability Gap Funding": "INR 4472.29 Crores"
+      }
+    },
+    "airports": {
+      "title": "Airports",
+      "date": "Till 05 July 2026",
+      "metrics": {
+        "Operational": "165",
+        "International*": "36",
+        "Custom": "11",
+        "Domestic*": "118",
+        "Joint venture International": "9",
+        "State Govt./ Private": "30"
+      }
+    },
+    "cargo": {
+      "title": "Cargo (In MT)",
+      "date": "Till 05 July 2026",
+      "metrics": {
+        "Inbound (Int)": "36",
+        "Inbound (Dom)": "42",
+        "Outbound (Int)": "197",
+        "Outbound (Dom)": "21",
+        "Total (Int)": "233",
+        "Total (Dom)": "63"
+      }
+    }
+  },
+  "source": "site",
+  "as_of": "On 05 July 2026",
+  "last_fetched_at": "2026-07-06 12:54:20",
+  "fetch_armed": false
+}
