@@ -147,7 +147,6 @@ st.markdown("""
 
 # ------------------------------------------------------------------ helpers
 BURGUNDY = "#7a1f2b"
-BAR_BLUE = "#2f5c74"
 YTD_GREY = "#9aa0a6"
 
 # --- Monthly YTD chart data (read from the internal report screenshot) ---------
@@ -157,7 +156,7 @@ YTD_CHARTS = [
         "title": "Aircraft Movement - YTD 2026", "subtitle": "",
         "bar_legend": "Total aircraft", "line_legend": "YTD aircraft",
         "bars": [253.0, 231.6, 242.9, 241.1, 254.2],
-        "ytd":  [253.0, 484.8, 727.5, 968.6, 1222.8],
+        "ytd":  [253.0, 484.6, 727.5, 968.6, 1222.8], # Fixed Feb YTD to 484.6
     },
     {
         "title": "Passenger Traffic - YTD 2026", "subtitle": "(in Thousands)",
@@ -200,7 +199,8 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
         cx = left + slot * i + slot / 2
         bw = slot * 0.40
         by = y_of(bars[i])
-        P.append(f'<rect x="{cx-bw/2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{base_y-by:.1f}" fill="{BAR_BLUE}"/>')
+        # Changed bar fill from BAR_BLUE to BURGUNDY
+        P.append(f'<rect x="{cx-bw/2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{base_y-by:.1f}" fill="{BURGUNDY}"/>')
         P.append(f'<text x="{cx:.1f}" y="{by-3:.1f}" text-anchor="middle" font-size="8.5" fill="#333">{bars[i]:.1f}</text>')
         P.append(f'<text x="{cx:.1f}" y="{base_y+13:.1f}" text-anchor="middle" font-size="8" fill="#555">{months[i]}</text>')
 
@@ -216,7 +216,8 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
 
     # legend
     ly = H - 10
-    P.append(f'<rect x="{left+4}" y="{ly-8}" width="11" height="9" fill="{BAR_BLUE}"/>')
+    # Changed legend box fill from BAR_BLUE to BURGUNDY
+    P.append(f'<rect x="{left+4}" y="{ly-8}" width="11" height="9" fill="{BURGUNDY}"/>')
     P.append(f'<text x="{left+19}" y="{ly}" font-size="9" fill="#444">{bar_legend}</text>')
     lx2 = W * 0.55
     P.append(f'<line x1="{lx2:.1f}" y1="{ly-4}" x2="{lx2+16:.1f}" y2="{ly-4}" stroke="{YTD_GREY}" stroke-width="2.2"/>')
