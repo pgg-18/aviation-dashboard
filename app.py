@@ -210,7 +210,7 @@ CHART_META = {
 }
 
 
-def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend, show_line=True):
+def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend, show_line=True, bar_width_ratio=0.40):
     W, H = 360, 232
     left, right = 10, 10
     top = 44 if subtitle else 32
@@ -234,7 +234,7 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
     # bars + bar labels + month labels
     for i in range(n):
         cx = left + slot * i + slot / 2
-        bw = slot * 0.40
+        bw = slot * bar_width_ratio
         by = y_of(bars[i])
         P.append(f'<rect x="{cx-bw/2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{base_y-by:.1f}" fill="{BURGUNDY}"/>')
         P.append(f'<text x="{cx:.1f}" y="{by-3:.1f}" text-anchor="middle" font-size="8.5" fill="#333">{bars[i]:.1f}</text>')
@@ -279,7 +279,7 @@ def _status_badge(store):
         return '<span class="dot dot-grey"></span>No data saved yet'
     src = store.get("source", "none")
     dot, label = {
-        "site":   ("dot-green", "Live (site)"),
+        "site":   ("dot-green", "Latest (site)"),
         "manual": ("dot-orange", "Manual"),
         "none":   ("dot-grey", "Empty"),
     }.get(src, ("dot-grey", src))
@@ -291,7 +291,7 @@ def _status_badge(store):
         f'<span class="dot {dot}"></span>{label}'
         f'&nbsp;&nbsp;|&nbsp;&nbsp;<span class="dot {armed_dot}"></span>{armed_label}'
         f'&nbsp;&nbsp;|&nbsp;&nbsp;As of: {as_of}'
-        f'&nbsp;&nbsp;|&nbsp;&nbsp;Last live fetch: {last_fetch}'
+        f'&nbsp;&nbsp;|&nbsp;&nbsp;Latest fetch: {last_fetch}'
     )
 
 
@@ -531,6 +531,7 @@ with tab1:
                 series.get("bars", []), series.get("ytd", []),
                 meta["bar_legend"], meta["line_legend"],
                 show_line=(ckey != "aircraft"),
+                bar_width_ratio=(0.62 if ckey == "aircraft" else 0.40),
             )
             charts_html += f'<div class="chart-card">{svg}</div>'
         charts_html += '</div>'
