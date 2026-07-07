@@ -1,5 +1,5 @@
 """
-Persistence + the caching state machine.
+Persistence + the caching state machine for the main dashboard tab (cards + charts).
 
 Kept free of Streamlit so it can be unit-tested on its own. The whole point of the
 manager's design lives here:
@@ -13,6 +13,9 @@ manager's design lives here:
   * "Update Manually" left completely BLANK is what arms the next fetch.
   * "Update Manually" with values typed in overwrites the saved numbers by hand
     (and disarms — no fetch needed).
+  * The monthly YTD chart numbers (bars + cumulative line) live in this SAME store
+    under "charts", so they persist and are editable from the Update Manually popup
+    too. They are never touched by Fetch Data / arm_refresh — only by chart edits.
 """
 
 from __future__ import annotations
@@ -21,8 +24,42 @@ import os
 from datetime import datetime
 
 from moca_scraper import SECTIONS
+from persistence import read_json, atomic_write_json
 
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard_data.json")
+# Where the saved data lives. By default it sits next to this script (fine for local
+# use). For deployment, point it at a PERSISTENT location so it survives restarts:
+#     export DASHBOARD_DATA_FILE=/data/dashboard_data.json      (Linux/VM/Docker)
+# On hosts with a persistent disk/volume this makes the "static across days" behaviour
+# hold. On fully ephemeral hosts (e.g. Streamlit Community Cloud) no local path
+# persists across restarts — you'd need an external store instead.
+DATA_FILE = os.environ.get(
+    "DASHBOARD_DATA_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard_data.json"),
+)
+
+MONTHS = ["January", "February", "March", "April", "May"]
+
+# Default monthly chart numbers (originally read off the manager's report screenshot).
+# Only the numeric arrays live here / are editable; titles, subtitles and legend text
+# are cosmetic and stay as constants in app.py.
+DEFAULT_CHARTS = {
+    "aircraft": {
+        "bars": [253.0, 231.6, 242.9, 241.1, 254.2],
+        "ytd":  [253.0, 484.8, 727.5, 968.6, 1222.8],
+    },
+    "passengers": {
+        "bars": [38.6, 35.1, 34.5, 33.8, 37.0],
+        "ytd":  [38.6, 73.7, 108.2, 142.1, 179.0],
+    },
+    "cargo": {
+        "bars": [324.7, 328.5, 343.2, 347.5, 364.4],
+        "ytd":  [324.7, 653.2, 996.4, 1343.9, 1708.3],
+    },
+}
+
+
+def _default_charts_copy() -> dict:
+    return json.loads(json.dumps(DEFAULT_CHARTS))
 
 
 def empty_skeleton() -> dict:
@@ -35,18 +72,18 @@ def empty_skeleton() -> dict:
 
 
 def load_store() -> dict | None:
-    if not os.path.exists(DATA_FILE):
-        return None
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return None
+    return read_json(DATA_FILE)
 
 
 def save_store(store: dict) -> None:
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(store, f, indent=2, ensure_ascii=False)
+    atomic_write_json(DATA_FILE, store)
+
+
+def get_charts(store: dict | None) -> dict:
+    """Charts, always present even for a store saved before charts existed."""
+    if store and store.get("charts"):
+        return store["charts"]
+    return _default_charts_copy()
 
 
 def _now() -> str:
@@ -62,6 +99,7 @@ def do_fetch(scrape_fn) -> tuple[dict, str, str]:
       'locked'  - did nothing on purpose; showing saved static data
       'error'   - the site fetch was armed but failed
     scrape_fn is injected so this can be tested without network access.
+    Chart data is carried forward unchanged — Fetch Data never touches charts.
     """
     store = load_store()
 
@@ -84,6 +122,7 @@ def do_fetch(scrape_fn) -> tuple[dict, str, str]:
             "as_of": _fmt_site_date(data),
             "last_fetched_at": _now(),
             "fetch_armed": False,  # spend the arming — next fetch is a no-op again
+            "charts": get_charts(store),  # preserve existing chart edits
         }
         save_store(new_store)
         reason = "first run" if first_run else "refresh was armed"
@@ -101,39 +140,80 @@ def arm_refresh(store: dict | None) -> tuple[dict, str]:
     """'Update Manually' submitted BLANK -> arm the next fetch, keep data unchanged."""
     if store is None:
         store = {"data": empty_skeleton(), "source": "none", "as_of": None,
-                 "last_fetched_at": None, "fetch_armed": True}
+                 "last_fetched_at": None, "fetch_armed": True,
+                 "charts": _default_charts_copy()}
     else:
         store = dict(store)
         store["fetch_armed"] = True
+        store.setdefault("charts", get_charts(store))
     save_store(store)
     return store, "Refresh armed. Close this and press Fetch Data to pull live numbers."
 
 
-def apply_manual(store: dict | None, entered: dict) -> tuple[dict, str]:
+def apply_manual(store: dict | None, entered: dict, entered_charts: dict | None = None) -> tuple[dict, str]:
     """
     'Update Manually' submitted WITH values.
     `entered` = {section_key: {metric_label: value_string}} containing only non-blank
     fields. Blank fields keep their previous value. Saving by hand disarms fetch.
+
+    `entered_charts` (optional) = {chart_key: {"bars": [str-or-""...], "ytd": [str-or-""...]}}
+    Same blank-keeps-previous rule, applied per data point.
+
+    Important: the "source"/"as_of"/"fetch_armed" status describes the CARD data
+    (top boxes), not the charts. If only chart numbers were edited (no card field
+    touched), that status is left exactly as it was — otherwise editing a chart
+    would wrongly make the dashboard claim its live site data had become "manual".
     """
     base = store["data"] if store and "data" in store else empty_skeleton()
     # deep-ish copy
     data = json.loads(json.dumps(base))
+    card_changed = False
     for skey, metrics in entered.items():
         if skey not in data:
             continue
         for label, val in metrics.items():
             if val is not None and str(val).strip() != "":
                 data[skey]["metrics"][label] = str(val).strip()
+                card_changed = True
+
+    charts = get_charts(store)
+    if entered_charts:
+        for ckey, series in entered_charts.items():
+            if ckey not in charts:
+                continue
+            for series_name in ("bars", "ytd"):
+                values = series.get(series_name)
+                if not values:
+                    continue
+                for i, raw in enumerate(values):
+                    if raw is None or str(raw).strip() == "":
+                        continue
+                    try:
+                        charts[ckey][series_name][i] = float(str(raw).strip())
+                    except ValueError:
+                        pass  # ignore anything that isn't a number, keep old value
+
+    if card_changed:
+        source = "manual"
+        as_of = datetime.now().strftime("%d %b %Y") + " (manual)"
+        fetch_armed = False  # an explicit manual override of card data disarms any pending fetch
+    else:
+        # chart-only edit: leave the card status exactly as it was
+        source = (store or {}).get("source", "none")
+        as_of = (store or {}).get("as_of")
+        fetch_armed = bool((store or {}).get("fetch_armed", False))
 
     new_store = {
         "data": data,
-        "source": "manual",
-        "as_of": datetime.now().strftime("%d %b %Y") + " (manual)",
+        "source": source,
+        "as_of": as_of,
         "last_fetched_at": (store or {}).get("last_fetched_at"),
-        "fetch_armed": False,
+        "fetch_armed": fetch_armed,
+        "charts": charts,
     }
     save_store(new_store)
-    return new_store, "Saved your manual values."
+    msg = "Saved your manual values." if card_changed else "Saved chart values."
+    return new_store, msg
 
 
 def _fmt_site_date(data: dict) -> str:
