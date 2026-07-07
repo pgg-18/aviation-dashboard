@@ -201,10 +201,10 @@ YTD_GREY = "#9aa0a6"
 # editable from the Update Manually popup (including adding new months). Keys must
 # match store.DEFAULT_CHARTS keys.
 CHART_META = {
-    "aircraft":   {"title": "Aircraft Movement - YTD 2026", "subtitle": "",
-                   "bar_legend": "Total aircraft", "line_legend": "YTD aircraft"},
+    "aircraft":   {"title": "Aircraft Movements", "subtitle": "",
+                   "bar_legend": "Total Air Traffic Movements", "line_legend": "YTD aircraft"},
     "passengers": {"title": "Passenger Traffic - YTD 2026", "subtitle": "(in Thousands)",
-                   "bar_legend": "Total Pax", "line_legend": "YTD Pax"},
+                   "bar_legend": "Total Passengers", "line_legend": "YTD Passengers"},
     "cargo":      {"title": "Air Cargo Movement - YTD 2026", "subtitle": "(in Thousand MT)",
                    "bar_legend": "Total Cargo", "line_legend": "YTD Cargo"},
 }
