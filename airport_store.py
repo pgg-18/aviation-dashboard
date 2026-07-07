@@ -81,9 +81,21 @@ def get_airports(store: dict | None) -> list[dict]:
     return sorted(rows, key=lambda r: (r.get("total_pax") or 0), reverse=True)
 
 
-def get_as_on(store: dict | None) -> str | None:
-    """The manually-set 'as on <date>' label, or None if never updated."""
-    return (store or {}).get("last_updated_display")
+def get_as_on_label(store: dict | None) -> str | None:
+    """Label for the passenger-figure columns (Departing/Arriving/Total Passengers,
+    the two percentages) — these are day-snapshot numbers, same 'On <date>' family
+    tab 1 uses for Domestic/International Traffic. None if never updated."""
+    date = (store or {}).get("last_updated_date")
+    return f"As on {date}" if date else None
+
+
+def get_till_label(store: dict | None) -> str | None:
+    """Label for the cumulative-style columns (Air Traffic Movements, Cargo) — same
+    'Till <date>' family tab 1 uses for Airports/Cargo. Same underlying date as the
+    As-on label since both are set by the same manual save; only the wording differs
+    to match each column's semantics. None if never updated."""
+    date = (store or {}).get("last_updated_date")
+    return f"Till {date}" if date else None
 
 
 def compute_total_row(rows: list[dict]) -> dict:
@@ -136,7 +148,7 @@ def apply_manual(store: dict | None, entered_rows: list[dict]) -> tuple[dict, st
         "airports": merged,
         "source": "manual",
         "last_updated": now.strftime("%d %b %Y %H:%M"),
-        "last_updated_display": "As on " + now.strftime("%d %B %Y"),
+        "last_updated_date": now.strftime("%d %B %Y"),
     }
     save_store(new_store)
     return new_store, "Saved airport data."
