@@ -77,22 +77,29 @@ st.markdown("""
         height: calc(100vh - 150px);
         margin-top: 0.5rem;
     }
-    .cards-grid {
+    /* Row 1: the 5 main KPI cards. Row 2: the 3 charts on the left, Grievances
+       card on the right — same row, side by side, not stacked. */
+    .kpi-row {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        grid-template-rows: 1fr 1fr;
         gap: 0.6rem;
-        flex: 0 0 78%;      /* two full rows now: row 2 only has the grievances card */
+        flex: 0 0 46%;
         min-height: 0;
     }
-    .charts-grid {
+    .lower-row {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.6rem;
+        flex: 1 1 auto;     /* fills whatever height is left under the KPI row */
+        min-height: 0;
+    }
+    .charts-wrap {
+        grid-column: 1 / span 4;
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.6rem;
-        flex: 1 1 auto;     /* charts get whatever's left \u2014 squished to make room above */
         min-height: 0;
     }
-    .card-r2c5 { grid-column: 5; grid-row: 2; }
     .card {
         border: 1px solid #e2e2e2;
         border-radius: 10px;
@@ -166,7 +173,10 @@ st.markdown("""
         font-weight: 700; background: #f1e4e6 !important;
         border-top: 2px solid #7a1f2b;
     }
-    .as-on { font-weight: 700; }
+    table.airport-table tr.group-row th {
+        background: #fff; text-align: left; font-weight: 700;
+        padding: 0.3rem 0.7rem 0.15rem; border-bottom: none;
+    }
     .as-on-red { color: #c62828; }
     .as-on-grey { color: #999; font-weight: 400; }
 </style>
@@ -480,20 +490,16 @@ with tab1:
                 f'</div>'
             )
 
-        # A true 2-row x 5-column grid. Row 1: Domestic, International, UDAN,
-        # Airports, Cargo (all same size). Row 2 is empty except column 5, which
-        # holds Air Sewa Grievances directly below Cargo — same card size as
-        # everything else, no shrinking.
+        # ---- top KPI row: Domestic, International, UDAN, Airports, Cargo ----
         ordinary_keys = ["domestic_traffic", "international_traffic", "udan", "airports", "cargo"]
-        cards_html = '<div class="cards-grid">'
+        kpi_row_html = '<div class="kpi-row">'
         for skey in ordinary_keys:
-            cards_html += _card_html(skey, SECTIONS[skey])
-        cards_html += _card_html("grievances_volume", SECTIONS["grievances_volume"], extra_class="card-r2c5")
-        cards_html += '</div>'
+            kpi_row_html += _card_html(skey, SECTIONS[skey])
+        kpi_row_html += '</div>'
 
-        # ---- charts: monthly YTD combo charts (bars + cumulative line), numbers from store ----
+        # ---- lower row: 3 charts on the left, Grievances card on the right ----
         chart_months = st_store.get_months(store)
-        charts_html = '<div class="charts-grid">'
+        charts_html = '<div class="charts-wrap">'
         for ckey, meta in CHART_META.items():
             series = charts_data.get(ckey, {})
             svg = _combo_chart_svg(
@@ -505,23 +511,27 @@ with tab1:
             charts_html += f'<div class="chart-card">{svg}</div>'
         charts_html += '</div>'
 
-        st.markdown(f'<div class="board">{cards_html}{charts_html}</div>', unsafe_allow_html=True)
+        lower_row_html = (
+            '<div class="lower-row">'
+            + charts_html
+            + _card_html("grievances_volume", SECTIONS["grievances_volume"])
+            + '</div>'
+        )
+
+        st.markdown(f'<div class="board">{kpi_row_html}{lower_row_html}</div>', unsafe_allow_html=True)
 
 with tab2:
     apt_data = apt_store.load_store()
     airports = apt_store.get_airports(apt_data)
-    as_on = apt_store.get_as_on(apt_data)
+    as_on_label = apt_store.get_as_on_label(apt_data)
+    till_label = apt_store.get_till_label(apt_data)
 
     acol1, acol2 = st.columns([5, 1])
     with acol1:
-        as_on_html = (
-            f'<span class="as-on as-on-red">{html.escape(as_on)}</span>' if as_on
-            else '<span class="as-on as-on-grey">Not yet updated</span>'
-        )
         st.markdown(
             '<div class="dash-header">'
             '<p class="dash-title">Airport Wise Data</p>'
-            f'<p class="dash-status">Top 10 airports &nbsp;|&nbsp; {as_on_html}</p>'
+            '<p class="dash-status">Top 10 airports</p>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -561,15 +571,37 @@ with tab2:
         "</tr>"
     )
 
+    # Passenger columns (Airport..Domestic %) are day-snapshot figures -> "As on",
+    # same family tab 1 uses for Domestic/International Traffic. Air Traffic
+    # Movements + Cargo are cumulative-style -> "Till", same family tab 1 uses for
+    # Airports/Cargo. Each group shows its own label, individually, above its columns.
+    as_on_html = (
+        f'<span class="as-on-red">{html.escape(as_on_label)}</span>' if as_on_label
+        else '<span class="as-on-grey">Not yet updated</span>'
+    )
+    till_html = (
+        f'<span class="as-on-red">{html.escape(till_label)}</span>' if till_label
+        else '<span class="as-on-grey">Not yet updated</span>'
+    )
+    group_row_html = (
+        '<tr class="group-row">'
+        f'<th colspan="6">{as_on_html}</th>'
+        f'<th colspan="2">{till_html}</th>'
+        '</tr>'
+    )
+
     table_html = (
         '<div class="airport-table-wrap">'
         '<table class="airport-table">'
-        '<thead><tr>'
+        '<thead>'
+        f'{group_row_html}'
+        '<tr>'
         '<th>Airport</th><th>Departing Passengers</th><th>Arriving Passengers</th>'
         '<th>Total Passengers</th><th>Percentage of International Passengers</th>'
         '<th>Percentage of Domestic Passengers</th><th>Air Traffic Movements</th>'
         '<th>Cargo (Metric Tonnes)</th>'
-        '</tr></thead>'
+        '</tr>'
+        '</thead>'
         f'<tbody>{rows_html}</tbody>'
         '</table></div>'
     )
