@@ -219,7 +219,10 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
     area_h = base_y - top
     n = len(months)
     slot = (W - left - right) / n
-    scale = (max(list(ytd) + list(bars)) or 1) * 1.15   
+    # When the line is hidden, don't let its (much larger, cumulative) values shrink
+    # the bars — scale against the bars alone so they fill the available height.
+    scale_values = (list(ytd) + list(bars)) if show_line else list(bars)
+    scale = (max(scale_values) if scale_values else 1) * 1.15
 
     def y_of(v):
         return base_y - (v / scale) * area_h
