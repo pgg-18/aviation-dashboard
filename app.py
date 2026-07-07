@@ -81,16 +81,29 @@ st.markdown("""
         display: grid;
         grid-template-columns: repeat(5, 1fr);
         gap: 0.6rem;
-        flex: 0 0 42%;      /* smaller boxes: top ~42% */
+        flex: 0 0 54%;      /* taller now: the 5th column holds two stacked cards */
         min-height: 0;
     }
     .charts-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.6rem;
-        flex: 1 1 auto;     /* charts fill the rest */
+        flex: 1 1 auto;     /* charts fill whatever's left (squished to make room above) */
         min-height: 0;
     }
+    .card-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        height: 100%;
+        min-height: 0;
+    }
+    .card-stack .card { flex: 1 1 0; min-height: 0; }
+    .card.compact .card-title { font-size: 0.74rem; }
+    .card.compact .card-date  { font-size: 0.56rem; }
+    .card.compact .card-body  { padding: 0.05rem 0.5rem 0.15rem; }
+    .card.compact .metric-label { font-size: 0.64rem; }
+    .card.compact .metric-value { font-size: 0.72rem; }
     .card {
         border: 1px solid #e2e2e2;
         border-radius: 10px;
@@ -160,19 +173,25 @@ st.markdown("""
     }
     table.airport-table tr:nth-child(even) td { background: #faf5f6; }
     table.airport-table td:first-child { font-weight: 700; color: #222; }
+    table.airport-table tr.total-row td {
+        font-weight: 700; background: #f1e4e6 !important;
+        border-top: 2px solid #7a1f2b;
+    }
+    .as-on { font-weight: 700; }
+    .as-on-red { color: #c62828; }
+    .as-on-grey { color: #999; font-weight: 400; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------------ helpers
 BURGUNDY = "#7a1f2b"
-BAR_BLUE = "#2f5c74"
 YTD_GREY = "#9aa0a6"
 
 # --- Chart cosmetics only (titles/subtitles/legend labels). The actual monthly
-# numbers live in store.py (DEFAULT_CHARTS) and in the saved store, and are editable
-# from the Update Manually popup. Keys must match store.DEFAULT_CHARTS keys.
-MONTHS = st_store.MONTHS
+# numbers AND the month list itself live in store.py / the saved store, and are
+# editable from the Update Manually popup (including adding new months). Keys must
+# match store.DEFAULT_CHARTS keys.
 CHART_META = {
     "aircraft":   {"title": "Aircraft Movement - YTD 2026", "subtitle": "",
                    "bar_legend": "Total aircraft", "line_legend": "YTD aircraft"},
@@ -183,7 +202,7 @@ CHART_META = {
 }
 
 
-def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend):
+def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend, show_line=True):
     W, H = 360, 232
     left, right = 10, 10
     top = 44 if subtitle else 32
@@ -209,27 +228,29 @@ def _combo_chart_svg(title, subtitle, months, bars, ytd, bar_legend, line_legend
         cx = left + slot * i + slot / 2
         bw = slot * 0.40
         by = y_of(bars[i])
-        P.append(f'<rect x="{cx-bw/2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{base_y-by:.1f}" fill="{BAR_BLUE}"/>')
+        P.append(f'<rect x="{cx-bw/2:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{base_y-by:.1f}" fill="{BURGUNDY}"/>')
         P.append(f'<text x="{cx:.1f}" y="{by-3:.1f}" text-anchor="middle" font-size="8.5" fill="#333">{bars[i]:.1f}</text>')
         P.append(f'<text x="{cx:.1f}" y="{base_y+13:.1f}" text-anchor="middle" font-size="8" fill="#555">{months[i]}</text>')
 
-    # YTD cumulative line + markers + labels
-    pts = [(left + slot * i + slot / 2, y_of(ytd[i])) for i in range(n)]
-    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-    P.append(f'<polyline points="{poly}" fill="none" stroke="{YTD_GREY}" stroke-width="2.2"/>')
-    for i, (x, y) in enumerate(pts):
-        P.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.4" fill="{YTD_GREY}"/>')
-        if i == 0:
-            continue
-        P.append(f'<text x="{x:.1f}" y="{y-5:.1f}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#555">{ytd[i]:.1f}</text>')
+    # YTD cumulative line + markers + labels (omitted entirely when show_line=False)
+    if show_line:
+        pts = [(left + slot * i + slot / 2, y_of(ytd[i])) for i in range(n)]
+        poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+        P.append(f'<polyline points="{poly}" fill="none" stroke="{YTD_GREY}" stroke-width="2.2"/>')
+        for i, (x, y) in enumerate(pts):
+            P.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.4" fill="{YTD_GREY}"/>')
+            if i == 0:
+                continue
+            P.append(f'<text x="{x:.1f}" y="{y-5:.1f}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#555">{ytd[i]:.1f}</text>')
 
     # legend
     ly = H - 10
-    P.append(f'<rect x="{left+4}" y="{ly-8}" width="11" height="9" fill="{BAR_BLUE}"/>')
+    P.append(f'<rect x="{left+4}" y="{ly-8}" width="11" height="9" fill="{BURGUNDY}"/>')
     P.append(f'<text x="{left+19}" y="{ly}" font-size="9" fill="#444">{bar_legend}</text>')
-    lx2 = W * 0.55
-    P.append(f'<line x1="{lx2:.1f}" y1="{ly-4}" x2="{lx2+16:.1f}" y2="{ly-4}" stroke="{YTD_GREY}" stroke-width="2.2"/>')
-    P.append(f'<text x="{lx2+20:.1f}" y="{ly}" font-size="9" fill="#444">{line_legend}</text>')
+    if show_line:
+        lx2 = W * 0.55
+        P.append(f'<line x1="{lx2:.1f}" y1="{ly-4}" x2="{lx2+16:.1f}" y2="{ly-4}" stroke="{YTD_GREY}" stroke-width="2.2"/>')
+        P.append(f'<text x="{lx2+20:.1f}" y="{ly}" font-size="9" fill="#444">{line_legend}</text>')
     P.append('</svg>')
     return "".join(P)
 
@@ -294,7 +315,28 @@ def manual_dialog(store):
                 )
 
     st.divider()
-    st.caption("Monthly chart figures (Jan\u2013May). Leave a box blank to keep its current number.")
+    months = st_store.get_months(store)
+    st.caption(f"Monthly chart figures ({months[0]}\u2013{months[-1]}). "
+               "Leave a box blank to keep its current number.")
+
+    # --- Add a month (e.g. June) ---
+    ac1, ac2 = st.columns([3, 1])
+    with ac1:
+        new_month = st.text_input(
+            "Add a month to the charts", value="", placeholder="e.g. June",
+            key=f"add_month__{nonce}",
+        )
+    with ac2:
+        st.write("")  # small vertical spacer so the button lines up with the input
+        st.write("")
+        if st.button("Add Month", use_container_width=True, key=f"add_month_btn__{nonce}"):
+            if new_month.strip():
+                _, msg = st_store.add_month(store, new_month.strip())
+                _flash(msg, "success")
+                st.rerun()
+            else:
+                st.warning("Type a month name first (e.g. June).")
+
     current_charts = st_store.get_charts(store)
     entered_charts: dict[str, dict] = {}
     for ckey, meta in CHART_META.items():
@@ -304,8 +346,8 @@ def manual_dialog(store):
             cb1, cb2 = st.columns(2)
             with cb1:
                 st.caption(meta["bar_legend"])
-                for i, mon in enumerate(MONTHS):
-                    cur_v = (cur_series.get("bars") or [None] * len(MONTHS))[i]
+                for i, mon in enumerate(months):
+                    cur_v = (cur_series.get("bars") or [None] * len(months))[i]
                     val = st.text_input(
                         mon, value="", placeholder=f"current: {cur_v}",
                         key=f"chart__{nonce}__{ckey}__bar__{i}",
@@ -313,8 +355,8 @@ def manual_dialog(store):
                     entered_charts[ckey]["bars"].append(val)
             with cb2:
                 st.caption(meta["line_legend"])
-                for i, mon in enumerate(MONTHS):
-                    cur_v = (cur_series.get("ytd") or [None] * len(MONTHS))[i]
+                for i, mon in enumerate(months):
+                    cur_v = (cur_series.get("ytd") or [None] * len(months))[i]
                     val = st.text_input(
                         mon, value="", placeholder=f"current: {cur_v}",
                         key=f"chart__{nonce}__{ckey}__ytd__{i}",
@@ -356,11 +398,7 @@ def airport_manual_dialog(apt_store_data):
     nonce = st.session_state.get("_apt_dlg_nonce", 0)
     entered_rows = []
 
-    col_labels = {
-        "airport": "Airport", "total_pax": "Total Passengers",
-        "outgoing_pax": "Outgoing Passengers", "incoming_pax": "Incoming Passengers",
-        "intl_pct": "International %", "dom_pct": "Domestic %",
-    }
+    col_labels = apt_store.COLUMN_LABELS
     for i, row in enumerate(rows):
         with st.expander(f"{i+1}. {row['airport']}"):
             entry = {}
@@ -428,8 +466,7 @@ with tab1:
         charts_data = st_store.get_charts(store)
 
         # ---- cards (burgundy head + white text, data values unchanged) ----
-        cards_html = '<div class="cards-grid">'
-        for skey, cfg in SECTIONS.items():
+        def _card_html(skey, cfg, compact=False):
             section = data.get(skey, {})
             metrics = section.get("metrics", {})
             date_txt = html.escape(section.get("date") or "")
@@ -443,8 +480,9 @@ with tab1:
                     f'<span class="metric-value">{val_txt}</span>'
                     f'</div>'
                 )
-            cards_html += (
-                f'<div class="card">'
+            cls = "card compact" if compact else "card"
+            return (
+                f'<div class="{cls}">'
                 f'<div class="card-head">'
                 f'<div class="card-title">{cfg["title"]}</div>'
                 f'<div class="card-date">{date_txt}</div>'
@@ -452,16 +490,31 @@ with tab1:
                 f'<div class="card-body">{rows_html}</div>'
                 f'</div>'
             )
+
+        # First 4 sections get their own full-height grid cell as before. Cargo and
+        # Air Sewa Grievances (Volume) share the 5th cell, stacked vertically.
+        ordinary_keys = ["domestic_traffic", "international_traffic", "udan", "airports"]
+        cards_html = '<div class="cards-grid">'
+        for skey in ordinary_keys:
+            cards_html += _card_html(skey, SECTIONS[skey])
+        cards_html += (
+            '<div class="card-stack">'
+            + _card_html("cargo", SECTIONS["cargo"], compact=True)
+            + _card_html("grievances_volume", SECTIONS["grievances_volume"], compact=True)
+            + '</div>'
+        )
         cards_html += '</div>'
 
         # ---- charts: monthly YTD combo charts (bars + cumulative line), numbers from store ----
+        chart_months = st_store.get_months(store)
         charts_html = '<div class="charts-grid">'
         for ckey, meta in CHART_META.items():
             series = charts_data.get(ckey, {})
             svg = _combo_chart_svg(
-                meta["title"], meta["subtitle"], MONTHS,
+                meta["title"], meta["subtitle"], chart_months,
                 series.get("bars", []), series.get("ytd", []),
                 meta["bar_legend"], meta["line_legend"],
+                show_line=(ckey != "aircraft"),
             )
             charts_html += f'<div class="chart-card">{svg}</div>'
         charts_html += '</div>'
@@ -471,13 +524,18 @@ with tab1:
 with tab2:
     apt_data = apt_store.load_store()
     airports = apt_store.get_airports(apt_data)
+    as_on = apt_store.get_as_on(apt_data)
 
     acol1, acol2 = st.columns([5, 1])
     with acol1:
+        as_on_html = (
+            f'<span class="as-on as-on-red">{html.escape(as_on)}</span>' if as_on
+            else '<span class="as-on as-on-grey">Not yet updated</span>'
+        )
         st.markdown(
             '<div class="dash-header">'
             '<p class="dash-title">Airport Wise Data</p>'
-            '<p class="dash-status">Top 10 airports by passenger volume &mdash; entered manually</p>'
+            f'<p class="dash-status">Top 10 airports by passenger volume &mdash; entered manually &nbsp;|&nbsp; {as_on_html}</p>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -489,23 +547,42 @@ with tab2:
     _show_flash()
 
     rows_html = ""
-    for i, r in enumerate(airports):
+    for r in airports:
         rows_html += (
             "<tr>"
             f"<td>{html.escape(str(r['airport']))}</td>"
+            f"<td>{r['depart_pax']:,}</td>"
+            f"<td>{r['arrive_pax']:,}</td>"
             f"<td>{r['total_pax']:,}</td>"
-            f"<td>{r['outgoing_pax']:,}</td>"
-            f"<td>{r['incoming_pax']:,}</td>"
             f"<td>{r['intl_pct']}%</td>"
             f"<td>{r['dom_pct']}%</td>"
+            f"<td>{r['atm']:,}</td>"
+            f"<td>{r['cargo_mt']:,}</td>"
             "</tr>"
         )
+
+    total_row = apt_store.compute_total_row(airports)
+    rows_html += (
+        '<tr class="total-row">'
+        f"<td>{html.escape(str(total_row['airport']))}</td>"
+        f"<td>{total_row['depart_pax']:,}</td>"
+        f"<td>{total_row['arrive_pax']:,}</td>"
+        f"<td>{total_row['total_pax']:,}</td>"
+        f"<td>{total_row['intl_pct']}%</td>"
+        f"<td>{total_row['dom_pct']}%</td>"
+        f"<td>{total_row['atm']:,}</td>"
+        f"<td>{total_row['cargo_mt']:,}</td>"
+        "</tr>"
+    )
+
     table_html = (
         '<div class="airport-table-wrap">'
         '<table class="airport-table">'
         '<thead><tr>'
-        '<th>Airport</th><th>Total Passengers</th><th>Outgoing Passengers</th>'
-        '<th>Incoming Passengers</th><th>International %</th><th>Domestic %</th>'
+        '<th>Airport</th><th>Departing Passengers</th><th>Arriving Passengers</th>'
+        '<th>Total Passengers</th><th>Percentage of International Passengers</th>'
+        '<th>Percentage of Domestic Passengers</th><th>Air Traffic Movements</th>'
+        '<th>Cargo (Metric Tonnes)</th>'
         '</tr></thead>'
         f'<tbody>{rows_html}</tbody>'
         '</table></div>'
