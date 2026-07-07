@@ -32,7 +32,17 @@ st.markdown("""
     div[data-testid="stDecoration"],
     div[data-testid="stStatusWidget"] { display: none !important; }
 
-    html, body { overflow: hidden !important; }
+    html, body { overflow: hidden !important; height: 100vh !important; }
+
+    /* Streamlit wraps the page in its own scrollable containers — html/body alone
+       isn't enough to stop scrolling, these need it too. */
+    div[data-testid="stAppViewContainer"],
+    div[data-testid="stMain"],
+    div[data-testid="stAppViewBlockContainer"],
+    section.main {
+        overflow: hidden !important;
+        height: 100vh !important;
+    }
 
     .block-container {
         padding-top: 0.6rem !important;
