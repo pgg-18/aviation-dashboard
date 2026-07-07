@@ -64,6 +64,14 @@ SECTIONS = {
             "Outbound (Dom)", "Total (Int)", "Total (Dom)",
         ],
     },
+    "grievances_volume": {
+        "title": "Air Sewa Grievances (Volume)",
+        "heading": "Air Sewa Grievances (by volume)",
+        "metrics": [
+            "Received", "Received (Till date)", "Resolved",
+            "Resolved (Till date)", "Pending", "Pending (Till date)",
+        ],
+    },
 }
 
 # Full ordered list of ALL section headings on the page. We need the ones that come
