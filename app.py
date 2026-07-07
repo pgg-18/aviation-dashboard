@@ -80,30 +80,19 @@ st.markdown("""
     .cards-grid {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
+        grid-template-rows: 1fr 1fr;
         gap: 0.6rem;
-        flex: 0 0 54%;      /* taller now: the 5th column holds two stacked cards */
+        flex: 0 0 78%;      /* two full rows now: row 2 only has the grievances card */
         min-height: 0;
     }
     .charts-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.6rem;
-        flex: 1 1 auto;     /* charts fill whatever's left (squished to make room above) */
+        flex: 1 1 auto;     /* charts get whatever's left \u2014 squished to make room above */
         min-height: 0;
     }
-    .card-stack {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        height: 100%;
-        min-height: 0;
-    }
-    .card-stack .card { flex: 1 1 0; min-height: 0; }
-    .card.compact .card-title { font-size: 0.74rem; }
-    .card.compact .card-date  { font-size: 0.56rem; }
-    .card.compact .card-body  { padding: 0.05rem 0.5rem 0.15rem; }
-    .card.compact .metric-label { font-size: 0.64rem; }
-    .card.compact .metric-value { font-size: 0.72rem; }
+    .card-r2c5 { grid-column: 5; grid-row: 2; }
     .card {
         border: 1px solid #e2e2e2;
         border-radius: 10px;
@@ -466,7 +455,7 @@ with tab1:
         charts_data = st_store.get_charts(store)
 
         # ---- cards (burgundy head + white text, data values unchanged) ----
-        def _card_html(skey, cfg, compact=False):
+        def _card_html(skey, cfg, extra_class=""):
             section = data.get(skey, {})
             metrics = section.get("metrics", {})
             date_txt = html.escape(section.get("date") or "")
@@ -480,7 +469,7 @@ with tab1:
                     f'<span class="metric-value">{val_txt}</span>'
                     f'</div>'
                 )
-            cls = "card compact" if compact else "card"
+            cls = f"card {extra_class}".strip()
             return (
                 f'<div class="{cls}">'
                 f'<div class="card-head">'
@@ -491,18 +480,15 @@ with tab1:
                 f'</div>'
             )
 
-        # First 4 sections get their own full-height grid cell as before. Cargo and
-        # Air Sewa Grievances (Volume) share the 5th cell, stacked vertically.
-        ordinary_keys = ["domestic_traffic", "international_traffic", "udan", "airports"]
+        # A true 2-row x 5-column grid. Row 1: Domestic, International, UDAN,
+        # Airports, Cargo (all same size). Row 2 is empty except column 5, which
+        # holds Air Sewa Grievances directly below Cargo — same card size as
+        # everything else, no shrinking.
+        ordinary_keys = ["domestic_traffic", "international_traffic", "udan", "airports", "cargo"]
         cards_html = '<div class="cards-grid">'
         for skey in ordinary_keys:
             cards_html += _card_html(skey, SECTIONS[skey])
-        cards_html += (
-            '<div class="card-stack">'
-            + _card_html("cargo", SECTIONS["cargo"], compact=True)
-            + _card_html("grievances_volume", SECTIONS["grievances_volume"], compact=True)
-            + '</div>'
-        )
+        cards_html += _card_html("grievances_volume", SECTIONS["grievances_volume"], extra_class="card-r2c5")
         cards_html += '</div>'
 
         # ---- charts: monthly YTD combo charts (bars + cumulative line), numbers from store ----
@@ -535,7 +521,7 @@ with tab2:
         st.markdown(
             '<div class="dash-header">'
             '<p class="dash-title">Airport Wise Data</p>'
-            f'<p class="dash-status">Top 10 airports by passenger volume &mdash; entered manually &nbsp;|&nbsp; {as_on_html}</p>'
+            f'<p class="dash-status">Top 10 airports &nbsp;|&nbsp; {as_on_html}</p>'
             '</div>',
             unsafe_allow_html=True,
         )
