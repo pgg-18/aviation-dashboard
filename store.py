@@ -38,6 +38,7 @@ DATA_FILE = os.environ.get(
 )
 
 MONTHS = ["January", "February", "March", "April", "May"]
+DEFAULT_MONTHS = list(MONTHS)
 
 # Default monthly chart numbers (originally read off the manager's report screenshot).
 # Only the numeric arrays live here / are editable; titles, subtitles and legend text
@@ -45,11 +46,11 @@ MONTHS = ["January", "February", "March", "April", "May"]
 DEFAULT_CHARTS = {
     "aircraft": {
         "bars": [253.0, 231.6, 242.9, 241.1, 254.2],
-        "ytd":  [253.0, 484.8, 727.5, 968.6, 1222.8],
+        "ytd":  [253.0, 484.6, 727.5, 968.6, 1222.8],
     },
     "passengers": {
         "bars": [38.6, 35.1, 34.5, 33.8, 37.0],
-        "ytd":  [38.6, 73.7, 108.2, 142.1, 179.0],
+        "ytd":  [38.6, 73.7, 108.2, 142.0, 179.0],
     },
     "cargo": {
         "bars": [324.7, 328.5, 343.2, 347.5, 364.4],
@@ -84,6 +85,49 @@ def get_charts(store: dict | None) -> dict:
     if store and store.get("charts"):
         return store["charts"]
     return _default_charts_copy()
+
+
+def get_months(store: dict | None) -> list[str]:
+    """The chart month axis, always present even for a store saved before this existed."""
+    if store and store.get("months"):
+        return list(store["months"])
+    return list(DEFAULT_MONTHS)
+
+
+def add_month(store: dict | None, month_name: str) -> tuple[dict, str]:
+    """
+    Add a new month column to every chart (e.g. 'June'). The new slot starts as a
+    placeholder — bar = 0, YTD line = carried flat from the previous month's YTD, so
+    the chart doesn't visually break before real numbers are typed in via
+    'Update Manually'. Everything else in the store (card data, source, fetch state)
+    is left exactly as it was.
+    """
+    month_name = (month_name or "").strip()
+    if not month_name:
+        return store, "Type a month name first."
+
+    months = get_months(store)
+    if month_name in months:
+        return store, f'"{month_name}" is already on the chart.'
+
+    charts = get_charts(store)
+    for series in charts.values():
+        series["bars"] = list(series.get("bars", [])) + [0.0]
+        last_ytd = series.get("ytd", [])
+        carry = last_ytd[-1] if last_ytd else 0.0
+        series["ytd"] = list(last_ytd) + [carry]
+
+    months = months + [month_name]
+
+    if store is None:
+        new_store = {"data": empty_skeleton(), "source": "none", "as_of": None,
+                     "last_fetched_at": None, "fetch_armed": False}
+    else:
+        new_store = dict(store)
+    new_store["months"] = months
+    new_store["charts"] = charts
+    save_store(new_store)
+    return new_store, f'Added "{month_name}". Reopen Update Manually to fill in its values.'
 
 
 def _now() -> str:
@@ -123,6 +167,7 @@ def do_fetch(scrape_fn) -> tuple[dict, str, str]:
             "last_fetched_at": _now(),
             "fetch_armed": False,  # spend the arming — next fetch is a no-op again
             "charts": get_charts(store),  # preserve existing chart edits
+            "months": get_months(store),  # preserve any added months
         }
         save_store(new_store)
         reason = "first run" if first_run else "refresh was armed"
@@ -141,11 +186,12 @@ def arm_refresh(store: dict | None) -> tuple[dict, str]:
     if store is None:
         store = {"data": empty_skeleton(), "source": "none", "as_of": None,
                  "last_fetched_at": None, "fetch_armed": True,
-                 "charts": _default_charts_copy()}
+                 "charts": _default_charts_copy(), "months": list(DEFAULT_MONTHS)}
     else:
         store = dict(store)
         store["fetch_armed"] = True
         store.setdefault("charts", get_charts(store))
+        store.setdefault("months", get_months(store))
     save_store(store)
     return store, "Refresh armed. Close this and press Fetch Data to pull live numbers."
 
@@ -210,6 +256,7 @@ def apply_manual(store: dict | None, entered: dict, entered_charts: dict | None 
         "last_fetched_at": (store or {}).get("last_fetched_at"),
         "fetch_armed": fetch_armed,
         "charts": charts,
+        "months": get_months(store),
     }
     save_store(new_store)
     msg = "Saved your manual values." if card_changed else "Saved chart values."
