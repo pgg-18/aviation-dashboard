@@ -32,8 +32,7 @@ st.markdown("""
     div[data-testid="stDecoration"],
     div[data-testid="stStatusWidget"] { display: none !important; }
 
-    /* Fixed to allow vertical scrolling on smaller screens */
-    html, body { overflow-y: auto !important; overflow-x: hidden !important; }
+    html, body { overflow: hidden !important; }
 
     .block-container {
         padding-top: 0.6rem !important;
@@ -409,9 +408,24 @@ def airport_manual_dialog(apt_store_data):
             entered_rows.append(entry)
 
     st.divider()
+    st.caption(
+        f'"{apt_store.TOTAL_ROW_LABEL}" is entered independently \u2014 it is NOT '
+        "the sum of the 10 airports above, since the real nationwide total covers "
+        "many more airports than just these top 10."
+    )
+    total_row = apt_store.get_total_row(apt_store_data)
+    entered_total = {}
+    with st.expander(f"11. {apt_store.TOTAL_ROW_LABEL}"):
+        for f in apt_store.TOTAL_FIELDS:
+            entered_total[f] = st.text_input(
+                col_labels[f], value="", placeholder=f"current: {total_row.get(f)}",
+                key=f"apt_total__{nonce}__{f}",
+            )
+
+    st.divider()
     c1, c2 = st.columns(2)
     if c1.button("Save", type="primary", use_container_width=True, key="apt_save"):
-        _, msg = apt_store.apply_manual(apt_store_data, entered_rows)
+        _, msg = apt_store.apply_manual(apt_store_data, entered_rows, entered_total)
         _flash(msg, "success")
         st.rerun()
     if c2.button("Cancel", use_container_width=True, key="apt_cancel"):
@@ -550,31 +564,27 @@ with tab2:
             f"<td>{r['depart_pax']:,}</td>"
             f"<td>{r['arrive_pax']:,}</td>"
             f"<td>{r['total_pax']:,}</td>"
-            f"<td>{r['intl_pct']}%</td>"
-            f"<td>{r['dom_pct']}%</td>"
             f"<td>{r['atm']:,}</td>"
             f"<td>{r['cargo_mt']:,}</td>"
             "</tr>"
         )
 
-    total_row = apt_store.compute_total_row(airports)
+    total_row = apt_store.get_total_row(apt_data)  # independent mock data, NOT a sum
     rows_html += (
         '<tr class="total-row">'
         f"<td>{html.escape(str(total_row['airport']))}</td>"
         f"<td>{total_row['depart_pax']:,}</td>"
         f"<td>{total_row['arrive_pax']:,}</td>"
         f"<td>{total_row['total_pax']:,}</td>"
-        f"<td>{total_row['intl_pct']}%</td>"
-        f"<td>{total_row['dom_pct']}%</td>"
         f"<td>{total_row['atm']:,}</td>"
         f"<td>{total_row['cargo_mt']:,}</td>"
         "</tr>"
     )
 
-    # Passenger columns (Airport..Domestic %) are day-snapshot figures -> "As on",
-    # same family tab 1 uses for Domestic/International Traffic. Air Traffic
-    # Movements + Cargo are cumulative-style -> "Till", same family tab 1 uses for
-    # Airports/Cargo. Each group shows its own label, individually, above its columns.
+    # Passenger columns (Airport..Total Passengers) are day-snapshot figures ->
+    # "As on", same family tab 1 uses for Domestic/International Traffic. Air
+    # Traffic Movements + Cargo are cumulative-style -> "Till", same family tab 1
+    # uses for Airports/Cargo. Each group shows its own label, individually.
     as_on_html = (
         f'<span class="as-on-red">{html.escape(as_on_label)}</span>' if as_on_label
         else '<span class="as-on-grey">Not yet updated</span>'
@@ -585,7 +595,7 @@ with tab2:
     )
     group_row_html = (
         '<tr class="group-row">'
-        f'<th colspan="6">{as_on_html}</th>'
+        f'<th colspan="4">{as_on_html}</th>'
         f'<th colspan="2">{till_html}</th>'
         '</tr>'
     )
@@ -597,9 +607,8 @@ with tab2:
         f'{group_row_html}'
         '<tr>'
         '<th>Airport</th><th>Departing Passengers</th><th>Arriving Passengers</th>'
-        '<th>Total Passengers</th><th>Percentage of International Passengers</th>'
-        '<th>Percentage of Domestic Passengers</th><th>Air Traffic Movements</th>'
-        '<th>Cargo (Metric Tonnes)</th>'
+        '<th>Total Passengers</th><th>Air Traffic Movements</th>'
+        '<th>Cargo (MT)</th>'
         '</tr>'
         '</thead>'
         f'<tbody>{rows_html}</tbody>'
