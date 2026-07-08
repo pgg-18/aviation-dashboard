@@ -554,7 +554,7 @@ with tab2:
     as_on_label = apt_store.get_as_on_label(apt_data)
     till_label = apt_store.get_till_label(apt_data)
 
-    acol1, acol2 = st.columns([5, 1])
+    acol1, acol2, acol3 = st.columns([4.4, 1, 1])
     with acol1:
         st.markdown(
             '<div class="dash-header">'
@@ -567,6 +567,9 @@ with tab2:
         if st.button("Update Manually", use_container_width=True, key="apt_update_btn"):
             st.session_state["_apt_dlg_nonce"] = st.session_state.get("_apt_dlg_nonce", 0) + 1
             airport_manual_dialog(apt_data)
+    with acol3:
+        if st.button("Print Dashboard", use_container_width=True, key="apt_print_btn"):
+            components.html("<script>window.parent.print();</script>", height=0)
 
     _show_flash()
 
